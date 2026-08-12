@@ -1,0 +1,7 @@
+.git/
+.bsp/
+.idea/
+docs/
+AGENTS.md
+target/*
+!target/calorie-ledger.jar

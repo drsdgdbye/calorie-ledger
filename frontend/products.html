@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Products — Calorie Calculator</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <nav>
+    <a href="/index.html">Dishes</a>
+    <a href="/products.html" class="active">Products</a>
+  </nav>
+</header>
+<main class="container">
+  <div class="page-header">
+    <h1>Products</h1>
+    <button id="btnNew" class="btn btn-primary">+ New product</button>
+  </div>
+  <input id="search" type="text" placeholder="Search by name..." class="search-input">
+  <div id="list" class="list"></div>
+  <div id="sentinel" class="sentinel"></div>
+  <p id="empty" class="empty hidden">Nothing found</p>
+</main>
+
+<dialog id="productDialog" class="dialog">
+  <form id="productForm">
+    <h2 id="dialogTitle">New product</h2>
+    <input type="hidden" id="productId">
+    <label>Name <input id="fName" type="text" required maxlength="200"></label>
+    <label>Category
+      <input id="fCategory" type="text" list="categoryList" maxlength="100">
+      <datalist id="categoryList"></datalist>
+    </label>
+    <label>Unit
+      <select id="fUnit">
+        <option value="GRAM">grams</option>
+        <option value="ML">milliliters</option>
+      </select>
+    </label>
+    <div class="grid-4">
+      <label>Calories /100 <input id="fCalories" type="number" min="0" step="1" required></label>
+      <label>Protein /100 <input id="fProtein" type="number" min="0" step="1" required></label>
+      <label>Fat /100 <input id="fFat" type="number" min="0" step="1" required></label>
+      <label>Carbs /100 <input id="fCarbs" type="number" min="0" step="1" required></label>
+    </div>
+    <p id="formError" class="error hidden"></p>
+    <div class="dialog-actions">
+      <button type="button" id="btnCancel" class="btn">Cancel</button>
+      <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="/js/products.js"></script>
+</body>
+</html>

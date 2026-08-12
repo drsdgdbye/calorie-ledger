@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dishes — Calorie Calculator</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <nav>
+    <a href="/index.html" class="active">Dishes</a>
+    <a href="/products.html">Products</a>
+  </nav>
+</header>
+<main class="container">
+  <div class="page-header">
+    <h1>Dishes</h1>
+    <a href="/dish-editor.html" class="btn btn-primary">+ New dish</a>
+  </div>
+  <input id="search" type="text" placeholder="Search by name..." class="search-input">
+  <div id="list" class="list"></div>
+  <div id="sentinel" class="sentinel"></div>
+  <p id="empty" class="empty hidden">Nothing found</p>
+</main>
+<script type="module" src="/js/dishes.js"></script>
+</body>
+</html>

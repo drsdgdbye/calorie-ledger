@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: calorie-ledger-postgres
+    environment:
+      POSTGRES_DB: calorie_ledger
+      POSTGRES_USER: calorie
+      POSTGRES_PASSWORD: calorie
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calorie -d calorie_ledger"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: calorie-ledger-app
+    ports:
+      - "10001:10001"
+    environment:
+      - DB_URL=jdbc:postgresql://postgres:5432/calorie_ledger
+      - DB_USER=calorie
+      - DB_PASSWORD=calorie
+      - DB_ADMIN_URL=jdbc:postgresql://postgres:5432/postgres
+      - DB_ADMIN_USER=calorie
+      - DB_ADMIN_PASSWORD=calorie
+      - SERVER_PORT=10001
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:10001/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  postgres-data:

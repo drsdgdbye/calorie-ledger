@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dish — Calorie Calculator</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar">
+    <nav>
+        <a href="/index.html">Dishes</a>
+        <a href="/products.html">Products</a>
+    </nav>
+</header>
+<main class="container">
+    <div class="page-header">
+        <h1 id="pageTitle">New dish</h1>
+        <button id="btnDelete" class="btn btn-danger hidden">Delete dish</button>
+    </div>
+
+    <label>Dish name <input id="dishName" type="text" required maxlength="200"></label>
+    <label>Cooked weight, g <input id="cookedWeight" type="number" min="1" step="1" required></label>
+
+    <h2>Ingredients</h2>
+    <div id="ingredients"></div>
+    <button id="btnAddIngredient" type="button" class="btn">+ Add ingredient</button>
+
+    <section class="totals-panel">
+        <h2>Totals</h2>
+        <div id="totals" class="totals-grid"></div>
+        <label>Portion eaten, g <input id="portionGrams" type="number" min="0" step="1" placeholder="e.g. 200"></label>
+        <div id="portionResult" class="portion-result"></div>
+    </section>
+
+    <p id="formError" class="error hidden"></p>
+    <div class="dialog-actions">
+        <button id="btnSave" class="btn btn-primary">Save</button>
+    </div>
+</main>
+
+<template id="ingredientRowTemplate">
+    <div class="ingredient-row">
+        <div class="autocomplete-wrap">
+            <input type="text" class="ingredient-search" placeholder="Search product...">
+            <div class="autocomplete-dropdown hidden"></div>
+        </div>
+        <input type="number" class="ingredient-qty" min="1" step="1" placeholder="g/ml">
+        <span class="ingredient-calories muted">—</span>
+        <button type="button" class="btn btn-small btn-danger ingredient-remove">✕</button>
+    </div>
+</template>
+
+<script type="module" src="/js/dish-editor.js"></script>
+</body>
+</html>
