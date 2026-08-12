@@ -184,6 +184,61 @@ object HttpApiSpec extends ZIOSpecDefault:
           yield assertTrue(result == ((Status.InternalServerError, """{"error":"Internal server error"}""")))
         }
       ),
+      suite("products import")(
+        test("POST /api/products/import imports a batch") {
+          val stub = StubProductService(
+            importF = (_, _) => ZIO.succeed(ProductImportResult(imported = 3, errors = Vector.empty))
+          )
+          val body =
+            """[{"name":"Рис","category":"Крупы","unit":"GRAM","caloriesPer100":330,"proteinPer100":7,"fatPer100":1,"carbsPer100":74}]"""
+          for
+            response <- withServer(products = stub) { port =>
+              Client.batched(send(Method.POST, s"http://localhost:$port/api/products/import", body))
+            }
+            result <- statusAndBody(response)
+          yield assertTrue(
+            response.status == Status.Ok,
+            JsonDecoder[ProductImportResult].decodeJson(result._2) ==
+              Right(ProductImportResult(imported = 3, errors = Vector.empty))
+          )
+        },
+        test("POST /api/products/import hands decoded records and structural failures to the service") {
+          for
+            captured <- Ref.make(Option.empty[Vector[ImportItem]])
+            stub = StubProductService(
+              importF = (_, items) => captured.set(Some(items)) *> ZIO.succeed(ProductImportResult(0, Vector.empty))
+            )
+            body =
+              """[{"name":"Рис","unit":"BOGUS","caloriesPer100":330,"proteinPer100":7,"fatPer100":1,"carbsPer100":74},{"name":"Гречка","category":"Крупы","unit":"GRAM","caloriesPer100":300,"proteinPer100":9,"fatPer100":2,"carbsPer100":60}]"""
+            response <- withServer(products = stub) { port =>
+              Client.batched(send(Method.POST, s"http://localhost:$port/api/products/import", body))
+            }
+            capturedItems <- captured.get
+          yield assertTrue(
+            response.status == Status.Ok,
+            capturedItems.exists(_.size == 2),
+            capturedItems.exists(_.head == Left(ImportIssueCode.InvalidUnit)),
+            capturedItems.exists(_.last.exists(_.name == "Гречка"))
+          )
+        },
+        test("POST /api/products/import maps a ValidationError to 400") {
+          val stub = StubProductService(importF = (_, _) => ZIO.fail(DomainError.ValidationError))
+          for
+            response <- withServer(products = stub) { port =>
+              Client.batched(send(Method.POST, s"http://localhost:$port/api/products/import", "[]"))
+            }
+            result <- statusAndBody(response)
+          yield assertTrue(result == ((Status.BadRequest, """{"error":"Invalid data"}""")))
+        },
+        test("POST /api/products/import rejects a malformed body") {
+          for
+            response <- withServer() { port =>
+              Client.batched(send(Method.POST, s"http://localhost:$port/api/products/import", "not json"))
+            }
+            result <- statusAndBody(response)
+          yield assertTrue(result._1 == Status.BadRequest)
+        }
+      ),
       suite("products update")(
         test("PUT /api/products/{id} updates a product") {
           val stub = StubProductService(

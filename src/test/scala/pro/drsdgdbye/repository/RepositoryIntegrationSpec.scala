@@ -239,6 +239,44 @@ object RepositoryIntegrationSpec extends ZIOSpecDefault:
           cream <- createProduct(repo, "Сливки")
           found <- repo.findExistingIds(userId, Vector(yogurt.id, cream.id, decode(ProductId.from(999999L))))
         yield assertTrue(found.toSet == Set(yogurt.id, cream.id))
+      },
+      test("createBatch inserts several products in one statement") {
+        for
+          repo <- ZIO.service[ProductRepository]
+          before <- repo.list(userId, None, 100, 0)
+          inserted <- repo.createBatch(
+            userId,
+            Vector(
+              NewProductRow("Батч1", Some("Крупы"), "GRAM", 300, 9, 2, 60),
+              NewProductRow("Батч2", None, "ML", 50, 1, 3, 6)
+            )
+          )
+          after <- repo.list(userId, None, 100, 0)
+        yield assertTrue(
+          inserted == 2,
+          after.size == before.size + 2,
+          after.map(_.name.value).contains("Батч1"),
+          after.map(_.name.value).contains("Батч2")
+        )
+      },
+      test("existingKeys returns only active products matching the exact (name, category)") {
+        for
+          repo <- ZIO.service[ProductRepository]
+          _ <- createProduct(repo, "Молоко", Some("Напитки"))
+          _ <- createProduct(repo, "молоко", Some("Напитки"))
+          archived <- createProduct(repo, "Кефирчик", Some("Напитки"))
+          _ <- repo.archive(userId, archived.id)
+          hit <- repo.existingKeys(userId, Vector("Молоко", "Кефирчик", "НЕТ"))
+          caseMiss <- repo.existingKeys(userId, Vector("молоко", "Молоко", "Молоко "))
+        yield assertTrue(
+          hit.contains(("Молоко", Some("Напитки"))),
+          !hit.contains(("Кефирчик", Some("Напитки"))),
+          !hit.contains(("НЕТ", Some("Напитки"))),
+          // "молоко" (lowercase) is stored intact, so it matches the exact passed spelling
+          caseMiss.contains(("молоко", Some("Напитки"))),
+          caseMiss.contains(("Молоко", Some("Напитки"))),
+          caseMiss.size == 2
+        )
       }
     )
 

@@ -12,6 +12,8 @@ final case class StubProductService(
     createF: (UserId, ProductInput) => IO[DomainError, Product] = (_, _) => ZIO.fail(DomainError.InternalError),
     updateF: (UserId, Long, ProductInput) => IO[DomainError, Product] = (_, _, _) =>
       ZIO.fail(DomainError.InternalError),
+    importF: (UserId, Vector[ImportItem]) => IO[DomainError, ProductImportResult] = (_, _) =>
+      ZIO.fail(DomainError.InternalError),
     archiveF: (UserId, Long) => IO[DomainError, Unit] = (_, _) => ZIO.unit
 ) extends ProductService:
 
@@ -24,6 +26,9 @@ final case class StubProductService(
 
   override def update(userId: UserId, productId: Long, input: ProductInput): IO[DomainError, Product] =
     updateF(userId, productId, input)
+
+  override def importProducts(userId: UserId, items: Vector[ImportItem]): IO[DomainError, ProductImportResult] =
+    importF(userId, items)
 
   override def archive(userId: UserId, productId: Long): IO[DomainError, Unit] = archiveF(userId, productId)
 

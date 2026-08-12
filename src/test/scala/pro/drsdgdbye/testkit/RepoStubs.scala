@@ -84,6 +84,9 @@ final case class MockProductRepository(
     categoriesF: UserId => Task[Vector[String]] = _ => ZIO.succeed(Vector.empty),
     findActiveF: (UserId, ProductId) => Task[Option[Product]] = (_, _) => ZIO.succeed(None),
     findExistingIdsF: (UserId, Vector[ProductId]) => Task[Vector[ProductId]] = (_, ids) => ZIO.succeed(ids),
+    existingKeysF: (UserId, Vector[String]) => Task[Set[(String, Option[String])]] = (_, _) => ZIO.succeed(Set.empty),
+    createBatchF: (UserId, Vector[NewProductRow]) => Task[Int] = (_, _) =>
+      ZIO.die(IllegalStateException("createBatchF not configured")),
     createF: MockProductRepository.Create = (_, _, _, _, _, _, _, _) =>
       ZIO.die(IllegalStateException("createF not configured")),
     updateF: MockProductRepository.Update = (_, _, _, _, _, _, _, _, _) => ZIO.succeed(None),
@@ -100,6 +103,12 @@ final case class MockProductRepository(
 
   override def findExistingIds(userId: UserId, ids: Vector[ProductId]): Task[Vector[ProductId]] =
     findExistingIdsF(userId, ids)
+
+  override def existingKeys(userId: UserId, names: Vector[String]): Task[Set[(String, Option[String])]] =
+    existingKeysF(userId, names)
+
+  override def createBatch(userId: UserId, rows: Vector[NewProductRow]): Task[Int] =
+    createBatchF(userId, rows)
 
   override def create(
       userId: UserId,

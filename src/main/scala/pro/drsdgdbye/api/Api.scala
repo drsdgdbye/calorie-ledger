@@ -8,7 +8,11 @@ import pro.drsdgdbye.service.{
   DishInput,
   DishListItemView,
   DishService,
+  ImportItem,
+  ImportIssueCode,
+  ImportItemError,
   NutritionView,
+  ProductImportResult,
   ProductInput,
   ProductService
 }
@@ -21,6 +25,7 @@ import sttp.tapir.json.zio.*
 import sttp.tapir.ztapir.{endpoint as _, path as _, query as _, statusCode as _, *}
 import zio.*
 import zio.json.*
+import zio.json.ast.Json
 
 /** Uniform error body returned for any failed request. */
 final case class ErrorResponse(error: String)
@@ -62,15 +67,36 @@ final case class ProductListResponse(items: Vector[ProductResponse])
 /** Paginated dish list response. */
 final case class DishListResponse(items: Vector[DishListItemView])
 
+/** Wire shape of one import record, before unit/domain validation; unit is decoded as a plain string so a bad unit can
+  * be reported per record instead of failing the whole batch decode.
+  */
+private[api] final case class RawImportRow(
+    name: String,
+    category: Option[String],
+    unit: String,
+    caloriesPer100: Int,
+    proteinPer100: Int,
+    fatPer100: Int,
+    carbsPer100: Int
+)
+
 /** Json codecs for all API wire types; kept in one place as the serialization SSOT. */
 object ApiCodecs:
   given JsonCodec[ProductUnit] =
     JsonCodec.string.transformOrFail(s => ProductUnit.values.find(_.toString == s).toRight("invalid unit"), _.toString)
+  given JsonCodec[ImportIssueCode] = JsonCodec.string.transformOrFail(
+    s => ImportIssueCode.values.find(_.wire == s).toRight("invalid import issue code"),
+    _.wire
+  )
+  given Schema[ImportIssueCode] = Schema.string
+  given JsonCodec[RawImportRow] = DeriveJsonCodec.gen[RawImportRow]
   given JsonCodec[ErrorResponse] = DeriveJsonCodec.gen[ErrorResponse]
   given JsonCodec[Health] = DeriveJsonCodec.gen[Health]
   given JsonCodec[ProductInput] = DeriveJsonCodec.gen[ProductInput]
   given JsonCodec[ProductResponse] = DeriveJsonCodec.gen[ProductResponse]
   given JsonCodec[ProductListResponse] = DeriveJsonCodec.gen[ProductListResponse]
+  given JsonCodec[ImportItemError] = DeriveJsonCodec.gen[ImportItemError]
+  given JsonCodec[ProductImportResult] = DeriveJsonCodec.gen[ProductImportResult]
   given JsonCodec[DishIngredientInput] = DeriveJsonCodec.gen[DishIngredientInput]
   given JsonCodec[DishInput] = DeriveJsonCodec.gen[DishInput]
   given JsonCodec[DishIngredientView] = DeriveJsonCodec.gen[DishIngredientView]
@@ -150,6 +176,14 @@ object Api:
       .in("api" / "products")
       .in(jsonBody[ProductInput])
       .out(jsonBody[ProductResponse])
+      .errorOut(errorOut)
+
+  private val productImportEndpoint
+      : PublicEndpoint[Vector[Json], (StatusCode, ErrorResponse), ProductImportResult, Any] =
+    endpoint.post
+      .in("api" / "products" / "import")
+      .in(jsonBody[Vector[Json]])
+      .out(jsonBody[ProductImportResult])
       .errorOut(errorOut)
 
   private val productUpdateEndpoint
@@ -245,6 +279,33 @@ object Api:
   ): ZIO[Any, (StatusCode, ErrorResponse), ProductResponse] =
     guarded(svc.create(UserId.default, input)).map(ProductResponse.from)
 
+  /** Decodes one import record: structural failures become [[ImportIssueCode.InvalidRecord]] and an unknown unit
+    * becomes [[ImportIssueCode.InvalidUnit]], leaving field-level and dedup validation to the service.
+    */
+  private def parseImportItem(j: Json): ImportItem =
+    JsonDecoder[RawImportRow].fromJsonAST(j) match
+      case Left(_) => Left(ImportIssueCode.InvalidRecord)
+      case Right(row) =>
+        ProductUnit.values.find(_.toString == row.unit) match
+          case None => Left(ImportIssueCode.InvalidUnit)
+          case Some(unit) =>
+            Right(
+              ProductInput(
+                row.name,
+                row.category,
+                unit,
+                row.caloriesPer100,
+                row.proteinPer100,
+                row.fatPer100,
+                row.carbsPer100
+              )
+            )
+
+  private def productImportLogic(svc: ProductService)(
+      items: Vector[Json]
+  ): ZIO[Any, (StatusCode, ErrorResponse), ProductImportResult] =
+    guarded(svc.importProducts(UserId.default, items.map(parseImportItem)))
+
   private def productUpdateLogic(svc: ProductService)(
       params: (String, ProductInput)
   ): ZIO[Any, (StatusCode, ErrorResponse), ProductResponse] =
@@ -307,6 +368,7 @@ object Api:
       productListEndpoint,
       productCategoriesEndpoint,
       productCreateEndpoint,
+      productImportEndpoint,
       productUpdateEndpoint,
       productDeleteEndpoint,
       dishListEndpoint,
@@ -325,6 +387,7 @@ object Api:
       productListEndpoint.zServerLogic(productListLogic(productService)),
       productCategoriesEndpoint.zServerLogic(_ => productCategoriesLogic(productService)),
       productCreateEndpoint.zServerLogic(productCreateLogic(productService)),
+      productImportEndpoint.zServerLogic(productImportLogic(productService)),
       productUpdateEndpoint.zServerLogic(productUpdateLogic(productService)),
       productDeleteEndpoint.zServerLogic(productDeleteLogic(productService)),
       dishListEndpoint.zServerLogic(dishListLogic(dishService)),

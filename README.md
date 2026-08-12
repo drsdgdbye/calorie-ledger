@@ -14,6 +14,7 @@ Calorie and nutrition calculator for composite dishes (recipes). Create products
 - Prefix search with typeahead and input debounce (300 ms).
 - Infinite scroll in lists via `IntersectionObserver` on the frontend + `limit`/`offset` on the backend (no `total`/`hasMore` — the page ends when fewer than `limit` items come back).
 - Deleting a product = archiving (`is_archived = true`) so existing dishes are not broken; archived products are hidden from lists.
+- Batch JSON import of products from a file (large files are sliced into chunks on the frontend; one malformed record never fails the whole batch, and duplicates are skipped).
 - Responsive, mobile-friendly UI; Swagger UI at `/swagger-ui`.
 
 ## Tech stack
@@ -135,6 +136,7 @@ Errors everywhere use a uniform body `{ "error": "<message>" }` with `400` (inva
 | `GET` | `/api/products?query=&limit=&offset=` | — | `{ "items": [Product] }` |
 | `GET` | `/api/products/categories` | — | `["Крупы", "Мясо", ...]` |
 | `POST` | `/api/products` | `ProductInput` | `Product` |
+| `POST` | `/api/products/import` | raw JSON array of `ProductInput` (no `id`/`isArchived`) | `ImportResult` |
 | `PUT` | `/api/products/{id}` | `ProductInput` | `Product` |
 | `DELETE` | `/api/products/{id}` | — | `204` (archives, `is_archived=true`) |
 
@@ -145,6 +147,24 @@ Errors everywhere use a uniform body `{ "error": "<message>" }` with `400` (inva
   "isArchived": false
 }
 ```
+
+#### Product import
+
+`POST /api/products/import` loads products from a raw JSON array; each entry matches `ProductInput` without `id`/`isArchived`. A batch must contain 1..`MaxImportBatchSize` (500) records. The frontend slices larger files into chunks and shifts the reported `index` by the chunk offset, so every error refers to the record's position in the original file.
+
+Each record is validated on its own, so one bad record is reported and skipped without failing the batch. Deduplication is case-sensitive on `(name, category)` against the user's active products and against records already accepted in this batch; archived products don't take part. Re-importing the same file is safe: every record comes back as `duplicate` and nothing is inserted.
+
+```json
+{
+  "imported": 3,
+  "errors": [
+    { "index": 5,  "code": "invalid_calories" },
+    { "index": 12, "code": "duplicate" }
+  ]
+}
+```
+
+`code` is one of `invalid_record`, `invalid_unit`, `invalid_name`, `invalid_category`, `invalid_calories`, `invalid_protein`, `invalid_fat`, `invalid_carbs`, `duplicate`. An empty array or more than `MaxImportBatchSize` records -> `400` `{ "error": "Invalid data" }`.
 
 ### Dishes
 

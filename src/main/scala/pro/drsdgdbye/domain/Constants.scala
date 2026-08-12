@@ -9,5 +9,7 @@ object Constants:
   val MaxCookedWeightGrams: Int = 50000
   val DefaultPageLimit: Int = 20
   val MaxPageLimit: Int = 100
+  val MaxImportBatchSize: Int = 500
+  val MaxHttpRequestBodyBytes: Int = 1 * 1024 * 1024
   val DefaultUserId: Long = 1L
   val DefaultUsername: String = "default"

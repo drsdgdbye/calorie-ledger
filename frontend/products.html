@@ -16,8 +16,13 @@
 <main class="container">
   <div class="page-header">
     <h1>Products</h1>
-    <button id="btnNew" class="btn btn-primary">+ New product</button>
+    <div class="page-actions">
+      <label id="btnImport" class="btn" for="importFile">Import JSON</label>
+      <button id="btnNew" class="btn btn-primary">+ New product</button>
+    </div>
   </div>
+  <input type="file" id="importFile" accept=".json,application/json" hidden>
+  <div id="importResult" class="import-result hidden"></div>
   <input id="search" type="text" placeholder="Search by name..." class="search-input">
   <div id="list" class="list"></div>
   <div id="sentinel" class="sentinel"></div>

@@ -3,5 +3,6 @@
 .idea/
 docs/
 AGENTS.md
+CONTEXT.md
 target/*
 !target/calorie-ledger.jar

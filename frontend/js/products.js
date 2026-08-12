@@ -19,7 +19,24 @@ const fProtein = document.getElementById('fProtein');
 const fFat = document.getElementById('fFat');
 const fCarbs = document.getElementById('fCarbs');
 
+const importBtn = document.getElementById('btnImport');
+const importFile = document.getElementById('importFile');
+const importResult = document.getElementById('importResult');
+
 const PAGE_SIZE = 20;
+const IMPORT_BATCH = 500;
+
+const ISSUE_TEXT = {
+    invalid_record: 'битая структура записи',
+    invalid_unit: 'неизвестная единица измерения',
+    invalid_name: 'некорректное имя',
+    invalid_category: 'некорректная категория',
+    invalid_calories: 'некорректная калорийность',
+    invalid_protein: 'некорректные белки',
+    invalid_fat: 'некорректные жиры',
+    invalid_carbs: 'некорректные углеводы',
+    duplicate: 'такое имя и категория уже есть в каталоге'
+};
 
 function renderProduct(p) {
     const row = document.createElement('div');
@@ -120,4 +137,64 @@ async function archiveProduct(id, row) {
     } catch (err) {
         alert(err.message);
     }
+}
+
+let importing = false;
+
+importFile.addEventListener('change', () => {
+    const file = importFile.files && importFile.files[0];
+    importFile.value = '';
+    if (file) handleImport(file);
+});
+
+async function handleImport(file) {
+    if (importing) return;
+    importing = true;
+    importBtn.classList.add('is-importing');
+    importResult.classList.add('hidden');
+    try {
+        const text = await file.text();
+        let records;
+        try { records = JSON.parse(text); } catch { throw new Error('Файл не является корректным JSON.'); }
+        if (!Array.isArray(records)) throw new Error('Файл должен содержать массив продуктов.');
+
+        let imported = 0;
+        const errors = [];
+        for (let start = 0; start < records.length; start += IMPORT_BATCH) {
+            const chunk = records.slice(start, start + IMPORT_BATCH);
+            if (chunk.length === 0) break;
+            const result = await apiPost('/products/import', chunk);
+            imported += result.imported;
+            result.errors.forEach(e => errors.push({ index: start + e.index, code: e.code }));
+        }
+        renderImportResult(imported, errors);
+        loadCategories();
+        listController.reset(searchInput.value.trim());
+    } catch (err) {
+        renderImportResult(0, [], err.message);
+    } finally {
+        importing = false;
+        importBtn.classList.remove('is-importing');
+    }
+}
+
+function renderImportResult(imported, errors, message) {
+    importResult.classList.remove('hidden');
+    if (message) {
+        importResult.textContent = 'Import failed: ' + message;
+        return;
+    }
+    if (errors.length === 0) {
+        importResult.textContent = `Imported ${imported} ${plural(imported, 'product', 'products')}.`;
+        return;
+    }
+    const shown = errors.slice(0, 50);
+    const lines = shown.map(e => `  Line ${e.index + 1}: ${ISSUE_TEXT[e.code] || e.code}`).join('\n');
+    importResult.textContent =
+        `Imported ${imported} ${plural(imported, 'product', 'products')}, skipped ${errors.length} records.` +
+        (errors.length > shown.length ? ` Showing the first ${shown.length}:` : ' Showing details:') + '\n' + lines;
+}
+
+function plural(n, one, many) {
+    return n === 1 ? one : many;
 }

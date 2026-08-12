@@ -61,6 +61,31 @@ object ApiSpec extends ZIOSpecDefault:
             JsonDecoder[ProductUnit].decodeJson("\"BOGUS\"").isLeft
           )
         },
+        test("import issue codes use the documented snake_case wire values") {
+          assertTrue(
+            JsonEncoder[ImportIssueCode].encodeJson(ImportIssueCode.InvalidRecord).toString == "\"invalid_record\"",
+            JsonDecoder[ImportIssueCode].decodeJson("\"duplicate\"") == Right(ImportIssueCode.Duplicate),
+            JsonDecoder[ImportIssueCode].decodeJson("\"invalid_unit\"") == Right(ImportIssueCode.InvalidUnit),
+            JsonDecoder[ImportIssueCode].decodeJson("\"BOGUS\"").isLeft
+          )
+        },
+        test("import result wire types round-trip through JSON") {
+          val result =
+            ProductImportResult(
+              imported = 3,
+              errors = Vector(
+                ImportItemError(5, ImportIssueCode.InvalidCalories),
+                ImportItemError(12, ImportIssueCode.Duplicate)
+              )
+            )
+          assertTrue(
+            JsonDecoder[ProductImportResult]
+              .decodeJson(JsonEncoder[ProductImportResult].encodeJson(result).toString) == Right(result),
+            JsonDecoder[ProductImportResult].decodeJson(
+              """{"imported":1,"errors":[]}"""
+            ) == Right(ProductImportResult(1, Vector.empty))
+          )
+        },
         test("simple wire types round-trip through JSON") {
           val product = ProductResponse(1L, "Рис", Some("Крупы"), ProductUnit.GRAM, 330, 7, 1, 74, isArchived = false)
           assertTrue(

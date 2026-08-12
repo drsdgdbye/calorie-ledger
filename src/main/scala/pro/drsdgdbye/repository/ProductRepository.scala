@@ -28,6 +28,18 @@ object ProductRow:
   inline given SchemaMeta[ProductRow] = schemaMeta[ProductRow]("products")
   inline given InsertMeta[ProductRow] = insertMeta[ProductRow](_.id, _.createdAt, _.updatedAt, _.isArchived)
 
+/** Flat import row for a multi-row insert; defaults (id, is_archived, created_at, updated_at) are left to the database.
+  */
+final case class NewProductRow(
+    name: String,
+    category: Option[String],
+    unit: String,
+    caloriesPer100: Int,
+    proteinPer100: Int,
+    fatPer100: Int,
+    carbsPer100: Int
+)
+
 /** Data access for products; the only layer allowed to talk to Quill for products. */
 trait ProductRepository:
   def list(userId: UserId, query: Option[String], limit: Int, offset: Int): Task[Vector[Product]]
@@ -37,6 +49,13 @@ trait ProductRepository:
   def findActive(userId: UserId, productId: ProductId): Task[Option[Product]]
 
   def findExistingIds(userId: UserId, ids: Vector[ProductId]): Task[Vector[ProductId]]
+
+  /** Returns the (name, category) pairs of active products for the user whose name is among `names`, compared exactly
+    * (case-sensitive, as stored).
+    */
+  def existingKeys(userId: UserId, names: Vector[String]): Task[Set[(String, Option[String])]]
+
+  def createBatch(userId: UserId, rows: Vector[NewProductRow]): Task[Int]
 
   def create(
       userId: UserId,
@@ -140,6 +159,37 @@ final case class ProductRepositoryLive(ctx: QuillContext.Ctx) extends ProductRep
             .map(_.id)
         }
         .map(_.map(id => decode(ProductId.from(id))).toVector)
+
+  def existingKeys(userId: UserId, names: Vector[String]): Task[Set[(String, Option[String])]] =
+    if names.isEmpty then ZIO.succeed(Set.empty)
+    else
+      ctx
+        .run {
+          query[ProductRow]
+            .filter(p => p.userId == lift(userId.value) && !p.isArchived && liftQuery(names.toList).contains(p.name))
+            .map(p => (p.name, p.category))
+        }
+        .map(_.toSet)
+
+  def createBatch(userId: UserId, rows: Vector[NewProductRow]): Task[Int] =
+    if rows.isEmpty then ZIO.succeed(0)
+    else
+      ctx
+        .run {
+          liftQuery(rows.toList).foreach { row =>
+            query[ProductRow].insert(
+              _.userId -> lift(userId.value),
+              _.name -> row.name,
+              _.category -> row.category,
+              _.unit -> infix"CAST(${row.unit} AS product_unit)".as[String],
+              _.caloriesPer100 -> row.caloriesPer100,
+              _.proteinPer100 -> row.proteinPer100,
+              _.fatPer100 -> row.fatPer100,
+              _.carbsPer100 -> row.carbsPer100
+            )
+          }
+        }
+        .map(_.sum.toInt)
 
   def create(
       userId: UserId,

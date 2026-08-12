@@ -19,6 +19,9 @@ object AppSpec extends ZIOSpecDefault:
 
     override def archive(_userId: UserId, _productId: Long) = ZIO.unit
 
+    override def importProducts(_userId: UserId, _items: Vector[ImportItem]) =
+      ZIO.fail(DomainError.InternalError)
+
   private val stubDishService: DishService = new DishService:
     override def list(_userId: UserId, _query: Option[String], _limit: Int, _offset: Int) =
       ZIO.succeed(Vector.empty[DishListItemView])
